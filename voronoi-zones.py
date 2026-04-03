@@ -8,22 +8,64 @@ INPUT_FILE = 'maps/rail-stations.csv'
 OUTPUT_FILE = 'maps/rail-stations-zones.csv'
 
 FILE_PATHS = {
-    'rail-stations': {
-        'input': 'maps/rail-stations.csv',
-        'output': 'maps/rail-stations-zones.csv',
+    'airports': {
+        'input': 'maps/matching/airports.csv',
+        'output': 'maps/matching-zones/airports-zones.csv',
+        'max_distance_miles': 50,
+        'merge_locations_in_output': True
+    },
+    'aquariums': {
+        'input': 'maps/matching/aquariums.csv',
+        'output': 'maps/matching-zones/aquariums-zones.csv',
         'max_distance_miles': 10,
         'merge_locations_in_output': True
     },
-    'airports': {
-        'input': 'maps/airports.csv',
-        'output': 'maps/airports-zones.csv',
-        'max_distance_miles': 30,
+    'cinemas': {
+        'input': 'maps/matching/cinemas.csv',
+        'output': 'maps/matching-zones/cinemas-zones.csv',
+        'max_distance_miles': 10,
         'merge_locations_in_output': True
-    }
+    },
+    'consulates': {
+        'input': 'maps/matching/consulates.csv',
+        'output': 'maps/matching-zones/consulates-zones.csv',
+        'max_distance_miles': 10,
+        'merge_locations_in_output': True
+    },
+    'hospitals': {
+        'input': 'maps/matching/hospitals.csv',
+        'output': 'maps/matching-zones/hospitals-zones.csv',
+        'max_distance_miles': 10,
+        'merge_locations_in_output': True
+    },
+    'museums': {
+        'input': 'maps/matching/museums.csv',
+        'output': 'maps/matching-zones/museums-zones.csv',
+        'max_distance_miles': 10,
+        'merge_locations_in_output': True
+    },
+    'parks': {
+        'input': 'maps/matching/parks.csv',
+        'output': 'maps/matching-zones/parks-zones.csv',
+        'max_distance_miles': 10,
+        'merge_locations_in_output': True
+    },
+    'rail-stations': {
+        'input': 'maps/matching/rail-stations.csv',
+        'output': 'maps/matching-zones/rail-stations-zones.csv',
+        'max_distance_miles': 10,
+        'merge_locations_in_output': True
+    },
+    'zoos': {
+        'input': 'maps/matching/zoos.csv',
+        'output': 'maps/matching-zones/zoos-zones.csv',
+        'max_distance_miles': 10,
+        'merge_locations_in_output': True
+    },
 }
 
+CENTER_POINT = (-0.1278, 51.5074)  # London center for distance calculations, just outside Charing Cross
 
-# get the lat/lon of each location, and create a voronoi zone polygon around it
 
 def generate_boundary_circle(center_lon, center_lat, radius_miles, num_points=72):
     """Generate a circle of lat/lon points at a given radius using the haversine inverse formula"""
@@ -45,8 +87,7 @@ def generate_voronoi_zones(locations, max_distance_miles=10):
     points = [[loc['longitude'], loc['latitude']] for loc in locations]
 
     # Calculate centre of all points
-    center_lon = sum(p[0] for p in points) / len(points)
-    center_lat = sum(p[1] for p in points) / len(points)
+    center_lon, center_lat = CENTER_POINT
 
     # Scale longitude by cos(lat) so Voronoi bisectors are correct at this latitude
     cos_lat = math.cos(math.radians(center_lat))
@@ -89,7 +130,8 @@ def generate_voronoi_zones(locations, max_distance_miles=10):
             if len(coords) >= 3:
                 zones.append({
                     'name': loc['name'],
-                    'polygon': coords
+                    'polygon': coords,
+                    'group': loc.get('group')  # include group in zone for merging pins in output if it exists
                 })
 
     return zones
@@ -97,11 +139,20 @@ def generate_voronoi_zones(locations, max_distance_miles=10):
     
 for layer in FILE_PATHS:
     input_file = FILE_PATHS[layer]['input']
+    print(f"Processing layer '{layer}' with input file '{input_file}'")
     output_file = FILE_PATHS[layer]['output']
     max_distance_miles = FILE_PATHS[layer]['max_distance_miles']
     merge_locations_in_output = FILE_PATHS[layer]['merge_locations_in_output']
     locations = util.parse_wkt_points_csv(input_file)
-    zones = generate_voronoi_zones(locations, max_distance_miles=max_distance_miles)
+    groups = util.parse_wkt_points_groups_csv(input_file)
+    zones = []
+    for group_name, group_locations in groups.items():
+        print(f"Generating Voronoi zones for group '{group_name}'")
+        group_zones = generate_voronoi_zones(group_locations, max_distance_miles)
+        for zone in group_zones:
+            zone['group'] = group_name
+        zones.extend(group_zones)
+
     util.write_zones_to_csv(
         zones, 
         locations if merge_locations_in_output else None,  # pass locations for merging pins if enabled

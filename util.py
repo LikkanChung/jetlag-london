@@ -41,9 +41,28 @@ def parse_wkt_points_csv(csv_file):
                 'name': row['name'],
                 'wkt_point': row['WKT'],
                 'latitude': lat,
-                'longitude': lon,   
+                'longitude': lon,
+                'group': row.get('group')  # optional group field for merging pins in output
             })
     return locations
+
+
+def parse_wkt_points_groups_csv(csv_file):
+    groups = {}
+    with open(csv_file, 'r') as csvfile:
+        reader = csv.DictReader(csvfile)
+        for row in reader:
+            lon, lat = wkt_point_to_latitude_longitude(row['WKT'])
+            group_name = row['group']
+            if group_name not in groups:
+                groups[group_name] = []
+            groups[group_name].append({
+                'name': row['name'],
+                'wkt_point': row['WKT'],
+                'latitude': lat,
+                'longitude': lon
+            })
+    return groups
 
 
 def write_zones_to_csv(
@@ -51,17 +70,19 @@ def write_zones_to_csv(
         locations,  # if locations is provided, add the location points to the CSV too
         output_file):
     with open(output_file, 'w', newline='') as csvfile:
-        fieldnames = ['name', 'WKT']
+        fieldnames = ['name', 'WKT', 'group'] 
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
         for zone in zones:
             writer.writerow({
                 'name': zone['name'],
-                'WKT': format_as_wkt_polygon(zone['polygon'])
+                'WKT': format_as_wkt_polygon(zone['polygon']),
+                'group': zone.get('group')  # include group in output if it exists for merging pins in output
             })
         if locations:
             for loc in locations:
                 writer.writerow({
                     'name': loc['name'],
-                    'WKT': loc['wkt_point']
+                    'WKT': loc['wkt_point'],
+                    'group': loc.get('group')  # include group in output if it exists for merging pins in output
                 })
