@@ -1,9 +1,13 @@
+import math
 import re
 import csv
+from scipy.spatial import ConvexHull
 
 
 # regex for WKT point which the cooridinates are in the format "POINT (lon lat)" and could also be in exponent format like "POINT (1.234567e-5 1.234567e-5)"
 WKT_POINT_REGEX = r'POINT\s?\((-?\d+\.?\d*(?:[eE][+-]?\d+)?) (-?\d+\.?\d*(?:[eE][+-]?\d+)?)\)'
+
+BORDER_POINTS_FILE = 'util/%s-border-points.csv'
 
 
 def wkt_point_to_latitude_longitude(wkt_point):
@@ -86,3 +90,29 @@ def write_zones_to_csv(
                     'WKT': loc['wkt_point'],
                     'group': loc.get('group')  # include group in output if it exists for merging pins in output
                 })
+
+
+def generate_convex_hull(points):
+    if len(points) < 3:
+        raise ValueError("At least 3 points are required to compute a convex hull")
+    hull = ConvexHull(points)
+    # Add the first point at the end to close the polygon
+    return [points[i] for i in hull.vertices] + [points[hull.vertices[0]]]
+
+
+def read_border_points_from_csv(map_name):
+    points = []
+    with open(BORDER_POINTS_FILE % map_name, 'r') as csvfile:
+        reader = csv.DictReader(csvfile)
+        for row in reader:
+            points.append((float(row['longitude']), float(row['latitude'])))
+    return points
+
+
+def write_border_points_to_csv(points, map_name):
+    with open(BORDER_POINTS_FILE % map_name, 'w', newline='') as csvfile:
+        fieldnames = ['longitude', 'latitude']
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        writer.writeheader()
+        for lon, lat in points:
+            writer.writerow({'longitude': lon, 'latitude': lat})

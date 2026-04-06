@@ -6,6 +6,7 @@ from shapely.geometry import Polygon
 
 INPUT_FILE = 'maps/rail-stations.csv'
 OUTPUT_FILE = 'maps/rail-stations-zones.csv'
+MAP_NAME = 'tfl-zone-1-and-2'
 
 FILE_PATHS = {
     'airports': {
@@ -67,21 +68,6 @@ FILE_PATHS = {
 CENTER_POINT = (-0.1278, 51.5074)  # London center for distance calculations, just outside Charing Cross
 
 
-def generate_boundary_circle(center_lon, center_lat, radius_miles, num_points=72):
-    """Generate a circle of lat/lon points at a given radius using the haversine inverse formula"""
-    circle_points = []
-    d = radius_miles / 3959.0  # angular distance in radians
-    lat1 = math.radians(center_lat)
-    lon1 = math.radians(center_lon)
-    for i in range(num_points):
-        bearing = math.radians(i * 360 / num_points)
-        lat2 = math.asin(math.sin(lat1) * math.cos(d) + math.cos(lat1) * math.sin(d) * math.cos(bearing))
-        lon2 = lon1 + math.atan2(math.sin(bearing) * math.sin(d) * math.cos(lat1),
-                                  math.cos(d) - math.sin(lat1) * math.sin(lat2))
-        circle_points.append((math.degrees(lon2), math.degrees(lat2)))
-    return circle_points
-
-
 def generate_voronoi_zones(locations, max_distance_miles=10):
     """Generate Voronoi zones for each location, clipped to a circle around the centre"""
     points = [[loc['longitude'], loc['latitude']] for loc in locations]
@@ -105,7 +91,9 @@ def generate_voronoi_zones(locations, max_distance_miles=10):
     all_points = scaled_points + dummy_points
 
     # Create boundary circle
-    boundary = Polygon(generate_boundary_circle(center_lon, center_lat, max_distance_miles))
+    # boundary = Polygon(generate_boundary_circle(center_lon, center_lat, max_distance_miles))
+    boundary = Polygon(util.read_border_points_from_csv(MAP_NAME))
+
 
     # Create Voronoi diagram in scaled space
     vor = Voronoi(all_points)
